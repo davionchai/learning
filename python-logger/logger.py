@@ -43,13 +43,13 @@ class DiscordBotHandler(logging.Handler):
         log_entry: dict = {
             # for all params, see https://discordapp.com/developers/docs/resources/webhook#execute-webhook
             "content": f"Log level: {record.levelname}",
-            "username": f"App name: {record.filename}",
+            "username": f"App name: {self.app_name}",
             # leave this out if you dont want an embed
             # for all params, see https://discordapp.com/developers/docs/resources/channel#embed-object
             "embeds": [
                 {
                     "description": description,
-                    "title": f"Calling from {self.app_name}",
+                    "title": f"Calling from {record.filename}",
                 }
             ],
         }
