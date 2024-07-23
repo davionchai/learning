@@ -98,6 +98,7 @@
 # PartiQL
 1. SQL for dynamodb
     1. only select, insert, update, and delete
+1. Support batch operations
 
 # Indexing
 1. Local Secondary Index (LSI)
@@ -112,3 +113,38 @@
     1. must provision rcu / wcu for each GSI
     1. can be added/modified after table creation
     1. if GSI's wcu got throttled, main table will be affected
+
+# DAX
+1. In memory cache for dynamodb
+1. Is in cluster mode with multiple nodes
+1. Can be multi AZ
+1. Compare to elasticache
+    1. dax is individual objects cache for data fetching
+    1. elasticache is good for aggregation
+1. Separate set of IAM
+
+# Streams
+1. Item level modifications
+1. Stream records can be
+    1. sent to kinesis data streams
+    1. read by aws lambda
+    1. read by kinesis client library (KCL) applications
+1. Data retention up to 24 hours
+1. Options to choose which information to be included
+    1. keys_only - only the key attributes of the modified item
+    1. new_image - the entire item, as it appears after it was modified 
+    1. old_image - the entire item, as it appears before it was modified
+    1. new_and_old_images - both new and old image of the item
+1. Are made of shards like kinesis but is fully automated
+1. Does not replay old data before stream is activated
+
+# Time to live (TTL)
+1. Free
+1. Automatically delete after expiry timestamp
+1. Hard delete after 48 hours
+1. Manually choose an attribute as ttl attribute hence ttl attribute must be number data type with unix epoch timestamp
+1. Deleted from LSI and GSI too
+1. Stream will capture the expiration event
+
+# For local dev
+1. Use dynamodb Local
