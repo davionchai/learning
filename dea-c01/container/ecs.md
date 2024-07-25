@@ -1,4 +1,4 @@
-# intro
+# Intro
 1. elastic container service
 1. has 2 types
     1. ec2 launch type
