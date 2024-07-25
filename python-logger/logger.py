@@ -31,6 +31,7 @@ class DiscordBotHandler(logging.Handler):
     def __init__(self, webhook: str, app_name: str):
         self.discord_api = DiscordApi(webhook=webhook)
         self.app_name: str = app_name
+        self.counter: int = 0
         super().__init__()
 
     def emit(self, record: logging.LogRecord):
@@ -49,10 +50,11 @@ class DiscordBotHandler(logging.Handler):
             "embeds": [
                 {
                     "description": description,
-                    "title": f"Calling from {record.filename}",
+                    "title": f"Calling from {record.filename} task count: `{self.counter}`",
                 }
             ],
         }
+        self.counter += 1
         return log_entry
 
     def __build_description(self, record: logging.LogRecord):
