@@ -76,3 +76,103 @@
 1. emits metrics to cloudwatch for monitoring
 
 # Consumers
+1. methods
+    1. kinesis sdk
+        1. `GetRecords` each shard maximum 2mb total aggregate throughput
+        1. `GetRecords` returns up to 10mb (then throttle for 5 sec) or up to 10,000 records
+        1. maximum 5 `GetRecords` api calls per shard per second meaning 200ms latency per call
+    1. kinesis client library (kcl)
+        1. java is first class
+        1. read from KPL (de-aggregation)
+        1. share multiple shards with multiple consumers in one group, shard discovery
+        1. has checkpoint feature to resume progress
+        1. leverage dynamodb for coordination and checkpointing (one row/shard)
+        1. need to manage dynamodb properly to prevent throttled performance
+        1. record processors will process thedata
+        1. `ExpiredIteratorException` means to increase WCU in dynamodb
+    1. kinesis connector library
+        1. older java library, uses kcl on top
+        1. write data to
+            1. s3
+            1. dynamodb
+            1. redshift
+            1. opensearch
+        1. might as well use knesis firehose or lambda
+    1. 3rd party libraries
+    1. kinesis firehose
+    1. aws lambda
+        1. can de-aggregate record from kpl
+        1. can run lightweight etl almost anywhere
+        1. can be used to trigger notifications / send emails
+        1. has configurable batch size
+    1. kinesis consumer enhanced fan out
+        1. intro-ed in aug 2018
+        1. works with kcl 2.0 and lambda
+        1. each consumer get 2mb/s of provisioned throughput per shard
+        1. no more 2mb/s limit from kinesis data streams
+        1. pushes data to consumers over http/2
+        1. reduced latency to ~70ms
+        1. default limit of 20 consumers per data stream
+
+# Scaling
+1. add shards = shard splitting
+1. reduce shards = merging shards 
+1. how to handle out of order records due to resharding
+    1. after resharding, process continues reading from child shards
+    1. data that is not read from child shards will still be in parent
+    1. if process start reading from child before complete reading from parent, process could read data for a partuclar hash key out of order
+    1. recommendation, after reshard, read entirely from parent until no new records
+    1. kcl has the logic built-in even after resharding operations
+1. auto scaling
+    1. no native
+    1. manually wirte own code with api call `UpdateShardCount`
+1. limitations
+    1. plan capacity in advance
+    1. one resharding operation (one shard event) at a time
+
+# Handling duplicates
+1. producers can create duplicates due to retries when network timeouts happen (ack never reaches back to producer)
+    1. recommended to embed unique record id to dedupe through consumer side
+1. consumers can read records for multiple times when
+    1. a worker terminates unexpectedly
+    1. a worker instance are added or removed
+    1. shards are merged or split
+    1. the application is deployed
+    1. recommended to make consumer application idempotent or have final workflow destination to handle duplicates
+
+# Security
+1. control access by iam
+1. encryption in flight using https
+1. encryption at rest using kms
+1. client side encryption can be implemented manually
+1. vpc endpoints are available
+
+# Firehose
+1. read from upstream and do simple transformation as batch (near real time), buffer can be disabled though
+1. can write into s3, redshift (start from s3), opensearch, 3rd-party partner destinations, custom destinations with proper http endpoint
+1. failed data can be archived to a s3 backup bucket (source data as well)
+1. main use case is to load data into redshift, s3, opensearch, splunk
+1. scaled automatically
+1. data transformations are done through lambda
+1. supports compression when target is s3 (gzip, zip, and snappy)
+1. gzip is the data further loaded into redshift
+1. only pay for amount of data going through firehose
+1. spark / kcl do not read from firehose!
+1. buffer size is flushed based on time and size rules
+    1. 32mb or 2 minutes, configurable
+    1. can autommatically control buffer size
+    1. high throughput cause buffer size to be hit
+    1. low throughput cause buffer time to be hit
+1. no storage layer
+
+# Kinesis data analytics
+1. is acutally managed flink for java to support sql applications
+1. can pair with lambda for transformation works
+1. recently support python and scala
+1. can develop flink application from scratch and load it into managed flink via s3
+1. additonally can use table api for sql access
+1. commonly used for streaming etl, continuous metric generation, responsive analytics
+1. charged by kinesis processing units (kpu) consumed per hour
+1. 1 kpu = 1 vcpu + 4 gb
+1. has automated schema discovery
+1. has `RANDOM_CUT_FOREST` to run anomaly detecton on numeric columns in a stream
