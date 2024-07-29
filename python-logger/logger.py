@@ -15,6 +15,21 @@ AVAILABLE_LOGGER_LEVEL: list[str] = [
     "CRITICAL",
 ]
 
+AVAILABLE_ROTATION_WHEN: list[str] = [
+    "S",  # seconds
+    "M",  # minutes
+    "H",  # hours
+    "D",  # days
+    "W0",  # mon
+    "W1",  # tues
+    "W2",  # wed
+    "W3",  # thurs
+    "W4",  # fri
+    "W5",  # sat
+    "W6",  # sun
+    "midnight",  # roll over at midnight, if atTime not specified
+]
+
 
 class CustomFormatter(logging.Formatter):
     """Custom formatter, overrides funcName with value of name_override if it exists
@@ -73,6 +88,9 @@ def log_setup(
     log_name: Optional[str] = None,
     provider: Optional[str] = None,
     webhook: Optional[str] = None,
+    rotation_when: Optional[str] = None,
+    rotation_interval: int = 1,
+    rotation_backupCount: int = 0,
 ) -> logging.Logger:
     _parent_dir: Path = Path(parent_dir) if isinstance(parent_dir, str) else parent_dir
     _logs_path: Path = Path(f"{_parent_dir}/logs/")
@@ -97,13 +115,19 @@ def log_setup(
     )
     logger.setLevel(_logger_level)
 
+    # rotation interval setup
+    _rotation_when: str = (
+        rotation_when if rotation_when in AVAILABLE_ROTATION_WHEN else "midnight"
+    )
     _log_filename_path: Path = Path(f"{_logs_path}/{log_filename}.log")
     handler = TimedRotatingFileHandler(
-        _log_filename_path, when="midnight", backupCount=3
+        _log_filename_path,
+        when=_rotation_when,
+        interval=rotation_interval,
+        backupCount=rotation_backupCount,
     )
 
     handler.setFormatter(formatter)
-    handler.suffix = "_%Y-%m-%d_%H%M%S.log"
     logger.addHandler(handler)
 
     # output to console
