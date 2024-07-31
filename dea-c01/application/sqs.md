@@ -64,3 +64,8 @@
 1. dlq has expiry, once expired they are done, recommended to be 14 days
 1. has a feature called `Redrive to Source` to help consume dlq msg
     1. can redrive the msg from dlq back into original source queue in batches without custom code
+
+# Fan out with sns
+1. push once in sns and receive by all sqs subscriber, use sqs to retry
+1. just make sure sqs queue access policy for sns to write
+1. cross region is possible with sqs queues
