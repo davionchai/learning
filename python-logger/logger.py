@@ -75,7 +75,7 @@ class DiscordBotHandler(logging.Handler):
     def __build_description(self, record: logging.LogRecord):
         description: dict = {}
         if "data" in record.__dict__:
-            description.update(record.data)
+            description.update(record.__dict__["data"])
         description.update({"message": record.message})
         return json.dumps(description)
 
