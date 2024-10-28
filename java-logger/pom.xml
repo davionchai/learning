@@ -24,12 +24,11 @@
         <maven.jar.plugin.mainClass>com.learning.davion.MyApp</maven.jar.plugin.mainClass>
         <maven.shade.plugin.version>3.0.0</maven.shade.plugin.version>
 
-        <!-- logger -->
-        <logback-classic.version>1.2.10</logback-classic.version>
+        <!-- dependency -->
+        <logback.version>1.2.10</logback.version>
         <slf4j-api.version>1.7.36</slf4j-api.version>
-
-        <!-- docker -->
-        <docker.maven.version></docker.maven.version>
+        <json.version>20240303</json.version>
+        <jackson.version>2.18.0</jackson.version>
    </properties>
 
    <dependencies>
@@ -44,20 +43,32 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>${logback-classic.version}</version>
+            <version>${logback.version}</version>
         </dependency>
 
         <!-- logback core -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-core</artifactId>
-            <version>1.2.10</version>
+            <version>${logback.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20240303</version>
+            <version>${json.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
         </dependency>
     </dependencies>
 

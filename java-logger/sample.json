@@ -1,0 +1,20 @@
+{
+    "embeds": [
+        {
+            "description": {
+                "message": "Application started"
+            },
+            "title": "Calling from main"
+        }
+    ],
+    "content": "Log level: INFO",
+    "username": "App name: com.learning.davion.MyApp"
+}
+
+{
+    "data": {
+        "x": "123.45",
+        "y": "123.45",
+        "z": "123.45"
+    }
+}
