@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
 
 public class DiscordAppender extends AppenderBase<ILoggingEvent> {
 
@@ -26,76 +28,97 @@ public class DiscordAppender extends AppenderBase<ILoggingEvent> {
         this.headers.add("application/json; charset=utf-8");
         this.headers.add("Accept");
         this.headers.add("application/json");
-        this.webhookUrl = System.getenv().getOrDefault("DISCORD_WEBHOOK_URL", "webhook_here");
+        this.webhookUrl = System.getenv().getOrDefault("DISCORD_WEBHOOK_URL",
+                "your_webhook_token");
 
-        if (checkDiscordHealth()) {
-            isDiscordUp = true;
+        this.isDiscordUp = checkHealth();
+        if (this.isDiscordUp) {
             super.start();
         } else {
-            addError("Failed to connect to Discord webhook during health check!");
+            addError("discord health check failed");
             return;
         }
     }
 
     @Override
     protected void append(ILoggingEvent eventObject) {
-        if (!isDiscordUp) {
-            addWarn("Discord is not available. Log will not be sent.");
-            return;
-        }
-
-        String message = buildMessage(eventObject);
-        sendToDiscord(message);
-    }
-
-    private boolean checkDiscordHealth() {
-        String healthCheckJson = new JSONObject()
-                                    .put("content", "/ping: checking Discord availability...")
-                                    .toString();
-
-        HttpRequest request = HttpRequest.newBuilder()
-                                .uri(URI.create(this.webhookUrl))
-                                .headers(this.headers.toArray(String[]::new))
-                                .POST(HttpRequest.BodyPublishers.ofString(healthCheckJson))
-                                .timeout(Duration.ofSeconds(10))
-                                .build();
-        
-        try {
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                addError(String.format("failed connecting to discord, got status code [%s]", response.statusCode()));
+        if (this.isDiscordUp) {
+            String message = this.buildMessage(eventObject);
+            HttpResponse<String> response = this.callDiscordAPI(message);
+            System.out.println(message);
+            if (response.statusCode() != 204) {
+                addError("message called failed");
             }
-            System.err.println("checkpoint hit");
-            return true;
-        } catch (IOException | InterruptedException e) {
-            addError(String.format("Exception occurred during Discord health check %s", e));
-            return false;
         }
     }
 
     private String buildMessage(ILoggingEvent eventObject) {
-        // Build your log message with the logging level and message
-        return String.format("**%s**: %s", eventObject.getLevel(), eventObject.getFormattedMessage());
+        Object[] args = eventObject.getArgumentArray();
+        JSONObject description = new JSONObject()
+                .put("message", eventObject.getFormattedMessage());
+        if (args != null && args.length > 0) {
+            for (Object arg : args) {
+                if (arg instanceof String) {
+                    try {
+                        JSONObject data = new JSONObject(arg);
+                        System.out.println(arg);
+                        System.out.println(data.toString()); // somehow the json is not converted back properly causing
+                                                             // the parsing failed
+
+                        if (data.has("data")) {
+                            for (String key : JSONObject.getNames(data)) {
+                                description.put(key, data.get(key));
+                            }
+                        }
+                    } catch (JSONException e) {
+                        addWarn("Argument is not valid JSON: " + arg);
+                    }
+                }
+            }
+        }
+
+        JSONObject embed = new JSONObject()
+                .put("description", description)
+                .put("title", String.format("Calling from %s", eventObject.getThreadName()));
+
+        JSONArray embeds = new JSONArray()
+                .put(embed);
+
+        JSONObject logEntry = new JSONObject()
+                .put("content", String.format("Log level: %s", eventObject.getLevel()))
+                .put("username", String.format("App name: %s", eventObject.getLoggerName()))
+                .put("embeds", embeds);
+
+        return logEntry.toString();
     }
 
-    private void sendToDiscord(String message) {
-        System.err.println(message);
-    //     RequestBody body = RequestBody.create(
-    //         MediaType.get("application/json; charset=utf-8"),
-    //         "{\"content\":\"" + message + "\"}"
-    //     );
+    private boolean checkHealth() {
+        String healthCheckJson = new JSONObject()
+                .put("content", "/ping: checking Discord availability...")
+                .toString();
 
-    //     Request request = new Request.Builder()
-    //         .url(webhookUrl)
-    //         .post(body)
-    //         .build();
+        HttpResponse<String> response = this.callDiscordAPI(healthCheckJson);
+        if (response.statusCode() != 204) {
+            addError(String.format("failed connecting to discord, got status code [%s]", response.statusCode()));
+            return false;
+        } else {
+            return true;
+        }
+    }
 
-    //     try (Response response = client.newCall(request).execute()) {
-    //         if (!response.isSuccessful()) {
-    //             addError("Failed to send log to Discord: " + response);
-    //         }
-    //     } catch (IOException e) {
-    //         addError("Exception occurred while sending log to Discord", e);
-    //     }
+    private HttpResponse<String> callDiscordAPI(String requestBody) {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(this.webhookUrl))
+                .headers(this.headers.toArray(String[]::new))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .timeout(Duration.ofSeconds(10))
+                .build();
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            return response;
+        } catch (IOException | InterruptedException e) {
+            addError(String.format("Exception occurred during Discord health check %s", e));
+            return null;
+        }
     }
 }
