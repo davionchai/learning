@@ -9,11 +9,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import org.json.JSONObject;
-import org.json.JSONArray;
-import org.json.JSONException;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.HashMap;
+import java.util.ArrayList;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class DiscordAppender extends AppenderBase<ILoggingEvent> {
 
@@ -45,7 +49,6 @@ public class DiscordAppender extends AppenderBase<ILoggingEvent> {
         if (this.isDiscordUp) {
             String message = this.buildMessage(eventObject);
             HttpResponse<String> response = this.callDiscordAPI(message);
-            System.out.println(message);
             if (response.statusCode() != 204) {
                 addError("message called failed");
             }
@@ -54,48 +57,61 @@ public class DiscordAppender extends AppenderBase<ILoggingEvent> {
 
     private String buildMessage(ILoggingEvent eventObject) {
         Object[] args = eventObject.getArgumentArray();
-        JSONObject description = new JSONObject()
-                .put("message", eventObject.getFormattedMessage());
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        Map<String, Object> description = new HashMap<>();
+        description.put("message", eventObject.getFormattedMessage());
+
         if (args != null && args.length > 0) {
             for (Object arg : args) {
                 if (arg instanceof String) {
                     try {
-                        JSONObject data = new JSONObject(arg);
-                        System.out.println(arg);
-                        System.out.println(data.toString()); // somehow the json is not converted back properly causing
-                                                             // the parsing failed
-
+                        JsonNode data = objectMapper.readTree((String) arg);
                         if (data.has("data")) {
-                            for (String key : JSONObject.getNames(data)) {
-                                description.put(key, data.get(key));
+                            Iterator<Entry<String, JsonNode>> fields = data.fields();
+
+                            while (fields.hasNext()) {
+                                Entry<String, JsonNode> field = fields.next();
+                                description.put(field.getKey(), field.getValue());
                             }
                         }
-                    } catch (JSONException e) {
+                    } catch (JsonProcessingException err) {
                         addWarn("Argument is not valid JSON: " + arg);
                     }
                 }
             }
         }
 
-        JSONObject embed = new JSONObject()
-                .put("description", description)
-                .put("title", String.format("Calling from %s", eventObject.getThreadName()));
+        try {
+            Map<String, Object> embed = new HashMap<>();
+            embed.put("description", objectMapper.writeValueAsString(description));
+            embed.put("title", String.format("Calling from %s", eventObject.getThreadName()));
 
-        JSONArray embeds = new JSONArray()
-                .put(embed);
+            List<Map<String, Object>> embeds = new ArrayList<>();
+            embeds.add(embed);
 
-        JSONObject logEntry = new JSONObject()
-                .put("content", String.format("Log level: %s", eventObject.getLevel()))
-                .put("username", String.format("App name: %s", eventObject.getLoggerName()))
-                .put("embeds", embeds);
+            Map<String, Object> logEntry = new HashMap<>();
+            logEntry.put("content", String.format("Log level: %s", eventObject.getLevel()));
+            logEntry.put("username", String.format("App name: %s", eventObject.getLoggerName()));
+            logEntry.put("embeds", embeds);
 
-        return logEntry.toString();
+            ObjectMapper logEntryMapper = new ObjectMapper();
+            return logEntryMapper.writeValueAsString(logEntry);
+        } catch (JsonProcessingException err) {
+            addError("%s", err);
+            return "{}";
+        }
+
     }
 
     private boolean checkHealth() {
-        String healthCheckJson = new JSONObject()
-                .put("content", "/ping: checking Discord availability...")
-                .toString();
+        String healthCheckJson = "";
+        try {
+            healthCheckJson = new ObjectMapper()
+                    .writeValueAsString(Map.of("content", "/ping: checking Discord availability..."));
+        } catch (JsonProcessingException err) {
+            addError("%s", err);
+        }
 
         HttpResponse<String> response = this.callDiscordAPI(healthCheckJson);
         if (response.statusCode() != 204) {
